@@ -1269,12 +1269,14 @@ static const char *dns_seeds[] = {
         //TODO: try to reverse the order of bytes for displaying the correct hash of the block
         //*(UInt256 *)@(checkpoint_array[i].hash).hexToData.reverse.bytes
         
-        //Including target of the last block in error message...
         
+        //Including target of the last block in error message...
         NSLog(@"%@:%d relayed orphan block %@, previous %@, last block is %@, height %d, target %X", peer.host, peer.port, blockHash, prevBlock, uint256_obj(self.lastBlock.blockHash), self.lastBlockHeight, self.lastBlock.target);
 
+        
         // ignore orphans older than one week ago
         if (block.timestamp < [NSDate timeIntervalSinceReferenceDate] + NSTimeIntervalSince1970 - 7*24*60*60) return;
+        
 
         // call getblocks, unless we already did with the previous block, or we're still downloading the chain
         if (self.lastBlockHeight >= peer.lastblock && ! uint256_eq(self.lastOrphan.blockHash, block.prevBlock)) {

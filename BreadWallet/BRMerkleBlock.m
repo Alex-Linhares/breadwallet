@@ -26,10 +26,51 @@
 #import "BRMerkleBlock.h"
 #import "NSMutableData+Bitcoin.h"
 #import "NSData+Bitcoin.h"
+#import <openssl/bn.h>
 
 #define MAX_TIME_DRIFT    (2*60*60)     // the furthest in the future a block is allowed to be timestamped
-#define MAX_PROOF_OF_WORK 0x1e0ffff0u   // highest value for difficulty target (higher values are less difficult)
+
+//#define MAX_PROOF_OF_WORK 0x207fffffu   // highest value for difficulty target (higher values are less difficult)
+//#define MAX_PROOF_OF_WORK 0x1e0ffff0u   // highest value for difficulty target (higher values are less difficult)
+#define MAX_PROOF_OF_WORK      0x1e0fffff //from Doughwallet: https://github.com/voisine/breadwallet/compare/master...peritus:doge-v0.5.3#diff-f3f22f098a4a2cc9e00d372caa2d8ed3R34
+
+
 #define TARGET_TIMESPAN   (84*60*60) // the targeted timespan between difficulty target adjustments
+
+
+// convert difficulty target format to bignum, as per: https://github.com/bitcoin/bitcoin/blob/master/src/uint256.h#L323
+static void setCompact(BIGNUM *bn, uint32_t compact)
+{
+    uint32_t size = compact >> 24, word = compact & 0x007fffff;
+    
+    if (size > 3) {
+        BN_set_word(bn, word);
+        BN_lshift(bn, bn, (size - 3)*8);
+    }
+    else BN_set_word(bn, word >> (3 - size)*8);
+    
+    BN_set_negative(bn, (compact & 0x00800000) != 0);
+}
+
+static uint32_t getCompact(const BIGNUM *bn)
+{
+    uint32_t size = BN_num_bytes(bn), compact = 0;
+    BIGNUM x;
+    
+    if (size > 3) {
+        BN_init(&x);
+        BN_rshift(&x, bn, (size - 3)*8);
+        compact = BN_get_word(&x);
+    }
+    else compact = BN_get_word(bn) << (3 - size)*8;
+    
+    if (compact & 0x00800000) { // if sign is already set, divide the mantissa by 256 and increment the exponent
+        compact >>= 8;
+        size++;
+    }
+    
+    return (compact | size << 24) | (BN_is_negative(bn) ? 0x00800000 : 0);
+}
 
 // from https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
 // Merkle trees are binary trees of hashes. Merkle trees in bitcoin use a double SHA-256, the SHA-256 hash of the
